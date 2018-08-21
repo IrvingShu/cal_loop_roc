@@ -4,7 +4,7 @@ import os
 import sys
 import numpy as np
 import math
-
+import random
 import argparse
 
 
@@ -60,7 +60,7 @@ def cal_roc(same_pairs_sim_list, diff_pairs_sim_list, fpr_draw):
     tpr = tp / (tp + fn)
 
     for i in range(num_threshs):
-        print(str(fpr_draw[i]) + '\t' + str(tpr[i]) )
+        print('fpr:' + str(fpr_draw[i]) + '\t' + 'tpr:' +str(tpr[i]) )
 
     print("Finished processing roc")
 
@@ -71,27 +71,36 @@ def cal_acc(same_pairs_sim_list, diff_pairs_sim_list):
     thr = np.linspace(0, 1, 100)
     positive = same_pairs_sim_list
     positive_nums = len(positive)
-    negtive = diff_pairs_sim_list[0:positive_nums]
+    negative = diff_pairs_sim_list
+    negative_nums = len(negative)    
 
-    print('positive pairs: %d' % positive_nums)
-    print('negative pairs: %d' % len(negtive))
+    new_positive = []
+    copy_num = negative_nums // positive_nums
+    for i in range(copy_num):
+        new_positive.extend(positive)
+    left_num = negative_nums - copy_num * positive_nums
+    for i in range(left_num):
+        new_positive.append(positive[i])
 
-    acc_list = []
+    new_positive_nums = len(new_positive)
+    print('positive pairs: %d' % new_positive_nums)
+    print('negative pairs: %d' % negative_nums)
+
+    max_acc = 0.0
     for i in range(len(list(thr))):
         T = 0
         F = 0
-        for j in range(len(positive)):
-            if positive[j] >= thr[i]:
+        for j in range(len(new_positive)):
+            if new_positive[j] >= thr[i]:
                 T += 1
-        for j in range(len(negtive)):
-            if negtive[j] < thr[i]:
+        for j in range(len(negative)):
+            if negative[j] < thr[i]:
                 T += 1
-        acc = 1.0 * T / (positive_nums + len(negtive))
-        print(T, acc)
-        acc_list.append(acc)
-    
-    max_acc = max(acc_list)
-    return max_acc
+        acc = 1.0 * T / (len(new_positive) + len(negative))
+        if acc > max_acc:
+            max_acc = acc
+            max_acc_thr = thr[i] 
+    return max_acc, max_acc_thr, new_positive_nums, negative_nums   
 
 
 def parse_args(argv):
@@ -112,16 +121,20 @@ def main(args):
 
     tpr,thresholds_draw = cal_roc(same_pairs_sim_list, diff_pairs_sim_list, fpr_draw)
 
-    acc = cal_acc(same_pairs_sim_list, diff_pairs_sim_list)
-    print('Acc: %f' % acc)
+    (max_acc, max_acc_thr, new_positive_nums, negative_nums) = cal_acc(same_pairs_sim_list, diff_pairs_sim_list)
+    print('Acc: %f' % max_acc, 'threshold:',str(max_acc_thr))
 
     with open(roc_save_txt, 'w') as f:
         f.write('Save Roc: ' + '\n')
+        f.write('positive pairs: %d\n' %len(same_pairs_sim_list))
+        f.write('negative pairs: %d\n' %len(diff_pairs_sim_list))
         for i in range(len(fpr_draw)):
-            f.write(str(fpr_draw[i]) + ': ' + str(tpr[i]) + ' ' + 'threshold: ' + str(thresholds_draw[i]) + '\n')
+            f.write('fpr:' + str(fpr_draw[i]) + ' ' + 'tpr:' + str(tpr[i]) + ' ' + 'threshold: ' + str(thresholds_draw[i]) + '\n')
         f.write('Save Acc : ' + '\n')
-        f.write('Acc: ' + str(acc))
-
+        f.write('positive pairs: %d \n' % new_positive_nums)
+        f.write('negative pairs: %d \n' % negative_nums)
+        f.write('Acc: ' + str(max_acc)+ ' ' + 'threshold: '+ str(max_acc_thr))
+       
 
 if __name__ == '__main__':
     main(parse_args(sys.argv[1:]))
